@@ -1,8 +1,12 @@
 from fastapi import FastAPI
+from sqlalchemy.orm import Session
+
+from database import SessionLocal, engine
+from models import Base, Note
 
 app = FastAPI()
 
-notes = []
+Base.metadata.create_all(bind=engine)
 
 
 @app.get("/")
@@ -13,38 +17,48 @@ def home():
     }
 
 
-@app.get("/notes")
-def get_notes():
-
-    return {
-        "notes": notes
-    }
-
-
 @app.post("/notes")
 def add_note(note: str):
 
-    notes.append(note)
+    db: Session = SessionLocal()
+
+    new_note = Note(content=note)
+
+    db.add(new_note)
+    db.commit()
+    db.refresh(new_note)
 
     return {
         "message": "Note added successfully",
-        "notes": notes
+        "note": new_note.content
     }
+
+
+@app.get("/notes")
+def get_notes():
+
+    db: Session = SessionLocal()
+
+    notes = db.query(Note).all()
+
+    return notes
 
 
 @app.delete("/notes/{note_id}")
 def delete_note(note_id: int):
 
-    if 0 <= note_id < len(notes):
+    db: Session = SessionLocal()
 
-        deleted_note = notes.pop(note_id)
+    note = db.query(Note).filter(Note.id == note_id).first()
 
+    if not note:
         return {
-            "message": "Note deleted successfully",
-            "deleted_note": deleted_note,
-            "notes": notes
+            "error": "Note not found"
         }
 
+    db.delete(note)
+    db.commit()
+
     return {
-        "error": "Invalid note ID"
+        "message": "Note deleted successfully"
     }
