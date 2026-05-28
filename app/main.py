@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from database import (
@@ -19,9 +20,24 @@ from auth import (
 
 app = FastAPI()
 
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+
+    allow_origins=["*"],
+
+    allow_credentials=True,
+
+    allow_methods=["*"],
+
+    allow_headers=["*"],
+)
+
+# Create Database Tables
 Base.metadata.create_all(bind=engine)
 
 
+# Database Session
 def get_db():
 
     db = SessionLocal()
@@ -33,6 +49,7 @@ def get_db():
         db.close()
 
 
+# Home Route
 @app.get("/")
 def home():
 
@@ -41,6 +58,7 @@ def home():
     }
 
 
+# Signup Route
 @app.post("/signup")
 def signup(
     user: UserCreate,
@@ -75,6 +93,7 @@ def signup(
     }
 
 
+# Login Route
 @app.post("/login")
 def login(
     user: UserCreate,

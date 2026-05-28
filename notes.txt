@@ -1,5 +1,0 @@
-hey piyush this side
-ai
-python
-fastapi
-docker
