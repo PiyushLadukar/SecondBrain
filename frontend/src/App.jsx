@@ -206,7 +206,7 @@ export default function App() {
             zIndex: 50,
             display: "flex",
             alignItems: "center",
-            gap: 8,
+            gap:9 ,
           }}
         >
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: toast.ok ? "#4caf76" : "#e05a4e", flexShrink: 0 }} />
