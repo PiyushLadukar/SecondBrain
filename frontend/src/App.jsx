@@ -7,6 +7,9 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
   const [toast, setToast] = useState(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(
+  !!localStorage.getItem("token")
+ )    
 
   function showToast(msg, ok = true) {
     setToast({ msg, ok })
@@ -31,8 +34,11 @@ export default function App() {
       const data = await res.json()
       if (mode === "login") {
         if (data.access_token) {
-          localStorage.setItem("token", data.access_token)
-          showToast(`Welcome back, ${username}`, true)
+           localStorage.setItem("token", data.access_token)
+
+           setIsLoggedIn(true)
+
+           showToast(`Welcome back, ${username}`, true)
         } else {
           showToast(data.error || "Login failed", false)
         }
@@ -44,7 +50,10 @@ export default function App() {
     }
     setLoading(false)
   }
-
+  function logout() {
+  localStorage.removeItem("token")
+  setIsLoggedIn(false)
+  }
   const inputStyle = {
     width: "100%",
     padding: "11px 12px 11px 38px",
@@ -56,7 +65,56 @@ export default function App() {
     borderRadius: 10,
     outline: "none",
   }
+ 
+   if (isLoggedIn) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#f5f3ef",
+        fontFamily: "'DM Sans', sans-serif",
+        padding: "2rem"
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "20px",
+          border: "1px solid #e2e0db",
+          padding: "2rem"
+        }}
+      >
+        <h1
+          style={{
+            fontFamily: "'Instrument Serif', serif",
+            fontSize: "42px"
+          }}
+        >
+          🚀 Welcome to SecondBrain
+        </h1>
 
+        <p style={{ color: "#888" }}>
+          Authentication working successfully.
+        </p>
+
+        <button
+          onClick={logout}
+          style={{
+            marginTop: "20px",
+            background: "#1a1916",
+            color: "#fff",
+            border: "none",
+            borderRadius: "10px",
+            padding: "12px 20px",
+            cursor: "pointer"
+          }}
+        >
+          Logout
+        </button>
+      </div>
+    </div>
+  )
+}
   return (
     <div
       className="min-h-screen flex items-center justify-center p-8"
