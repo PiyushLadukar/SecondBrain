@@ -44,6 +44,10 @@ export default function App() {
       if (mode === "login") {
         if (data.access_token) {
            localStorage.setItem("token", data.access_token)
+           localStorage.setItem(
+           "username",
+            username
+           )
 
            setIsLoggedIn(true)
 
