@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from schemas import ChatRequest
+from ai import ask_ai
 
 from database import (
     SessionLocal,
@@ -130,4 +132,17 @@ def login(
     return {
         "access_token": token,
         "token_type": "bearer"
+    }
+
+#chat
+
+@app.post("/chat")
+def chat(request: ChatRequest):
+
+    answer = ask_ai(
+        request.message
+    )
+
+    return {
+        "response": answer
     }
