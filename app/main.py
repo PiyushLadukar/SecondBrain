@@ -3,6 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from schemas import ChatRequest
 from ai import ask_ai
+from schemas import ChatCreate
+
+from services.chat_services import (
+    create_chat,
+    get_chats
+)
 
 from database import (
     SessionLocal,
@@ -146,3 +152,18 @@ def chat(request: ChatRequest):
     return {
         "response": answer
     }
+
+@app.post("/chat-session")
+
+def new_chat(
+    chat: ChatCreate
+    ):
+
+    return create_chat(
+        chat.title
+    )
+
+@app.get("/chat-session")
+def all_chats():
+
+    return get_chats()

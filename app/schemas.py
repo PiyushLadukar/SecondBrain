@@ -8,3 +8,7 @@ class UserCreate(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+
+class ChatCreate(BaseModel):
+
+    title: str    
