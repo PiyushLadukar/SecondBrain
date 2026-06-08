@@ -12,7 +12,6 @@ def create_chat(title):
 
     return data.data
 
-
 def get_chats():
 
     data = supabase.table(
