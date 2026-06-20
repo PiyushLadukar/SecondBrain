@@ -5,7 +5,7 @@ from schemas import ChatRequest
 from ai import ask_ai
 from schemas import ChatCreate
 
-from app.services.chat_services import (
+from services.chat_services import (
     create_chat,
     get_chats
 )
