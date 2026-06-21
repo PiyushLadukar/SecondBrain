@@ -571,7 +571,6 @@ export default function Chat() {
           </div>
         )}
       </div>
-
       <ChatInput
         value={message}
         onChange={setMessage}
