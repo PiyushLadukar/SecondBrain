@@ -432,56 +432,68 @@ function ChatInput({ value, onChange, onSend, disabled }) {
 }
 
 // ---------------------------------------------------------------------------
-// Main component — backend logic / state management unchanged
+// Main component
 // ---------------------------------------------------------------------------
 
 export default function Chat() {
   const [message, setMessage] = useState("")
   const [messages, setMessages] = useState(INITIAL_MESSAGES)
   const [isThinking, setIsThinking] = useState(false)
+  const [hasStartedStreaming, setHasStartedStreaming] = useState(false)
+  const [metrics, setMetrics] = useState({
+    model: "llama3.2",
+    provider: "Ollama",
+    responseTime: null,
+    status: "Ready",
+  })
 
   const scrollRef = useRef(null)
   const username = localStorage.getItem("username") || "Piyush"
+
+  const showWelcome = messages.length <= 1 && !isThinking
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
   }, [messages, isThinking])
 
-  async function sendMessage(overrideText) {
-  const text = (overrideText ?? message).trim()
-
-  if (!text || isThinking) return
-
-  const userMessage = {
-    sender: "user",
-    text,
+  function handleQuickAction(prompt) {
+    setMessage(prompt)
   }
 
-  // Add user message + empty AI message
-  setMessages((prev) => [
-    ...prev,
-    userMessage,
-    {
-      sender: "ai",
-      text: "",
-    },
-  ])
+  async function sendMessage(overrideText) {
+    const text = (overrideText ?? message).trim()
 
-  setMessage("")
-  setIsThinking(true)
+    if (!text || isThinking) return
 
-  setMetrics((prev) => ({
-    ...prev,
-    status: "Generating",
-    responseTime: null,
-  }))
+    const userMessage = {
+      sender: "user",
+      text,
+    }
 
-  const startTime = performance.now()
-
-  try {
-    const response = await fetch(
-      "http://127.0.0.1:8000/chat/stream",
+    // Add user message + empty AI message (placeholder to be filled by stream)
+    setMessages((prev) => [
+      ...prev,
+      userMessage,
       {
+        sender: "ai",
+        text: "",
+      },
+    ])
+
+    setMessage("")
+    setIsThinking(true)
+    setHasStartedStreaming(false)
+
+    setMetrics((prev) => ({
+      ...prev,
+      status: "Generating",
+      responseTime: null,
+    }))
+
+    const startTime = performance.now()
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/chat/stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -489,75 +501,80 @@ export default function Chat() {
         body: JSON.stringify({
           message: text,
         }),
-      }
-    )
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-
-    if (!response.body) {
-      throw new Error("Streaming response unavailable")
-    }
-
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-
-    while (true) {
-      const { value, done } = await reader.read()
-
-      if (done) break
-
-      const chunk = decoder.decode(value, {
-        stream: true,
       })
 
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      if (!response.body) {
+        throw new Error("Streaming response unavailable")
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let firstChunkSeen = false
+
+      while (true) {
+        const { value, done } = await reader.read()
+
+        if (done) break
+
+        const chunk = decoder.decode(value, { stream: true })
+
+        if (chunk) {
+          if (!firstChunkSeen) {
+            firstChunkSeen = true
+            setHasStartedStreaming(true)
+          }
+
+          setMessages((prev) => {
+            const updated = [...prev]
+            const lastIndex = updated.length - 1
+
+            updated[lastIndex] = {
+              ...updated[lastIndex],
+              text: updated[lastIndex].text + chunk,
+            }
+
+            return updated
+          })
+        }
+      }
+
+      const time = (performance.now() - startTime) / 1000
+
+      setMetrics({
+        model: "llama3.2",
+        provider: "Ollama",
+        responseTime: time.toFixed(2),
+        status: "Ready",
+      })
+    } catch (err) {
+      console.error("Chat error:", err)
+
+      // Replace the pending empty AI message with an error message
       setMessages((prev) => {
         const updated = [...prev]
         const lastIndex = updated.length - 1
 
         updated[lastIndex] = {
-          ...updated[lastIndex],
-          text: updated[lastIndex].text + chunk,
+          sender: "ai",
+          text: "I couldn't connect to the AI service. Make sure the backend and Ollama are running.",
         }
 
         return updated
       })
+
+      setMetrics((prev) => ({
+        ...prev,
+        status: "Error",
+      }))
+    } finally {
+      setIsThinking(false)
+      setHasStartedStreaming(false)
     }
-
-    const time =
-      (performance.now() - startTime) / 1000
-
-    setMetrics({
-      model: "llama3.2",
-      provider: "Ollama",
-      responseTime: time.toFixed(2),
-      status: "Ready",
-    })
-  } catch (err) {
-    console.error("Chat error:", err)
-
-    // Replace empty AI message with error
-    setMessages((prev) => {
-      const updated = [...prev]
-      const lastIndex = updated.length - 1
-
-      updated[lastIndex] = {
-        sender: "ai",
-        text: "I couldn't connect to the AI service. Make sure the backend and Ollama are running.",
-      }
-
-      return updated
-    })
-
-    setMetrics((prev) => ({
-      ...prev,
-      status: "Error",
-    }))
-  } finally {
-    setIsThinking(false)
   }
-}
 
   return (
     <div
@@ -640,10 +657,10 @@ export default function Chat() {
           <WelcomeSection username={username} onQuickAction={handleQuickAction} />
         ) : (
           <div style={{ maxWidth: 760, width: "100%", margin: "0 auto", padding: "24px clamp(12px, 4vw, 20px) 8px" }}>
-            {messages.map((msg, index) => (
-              <MessageBubble key={index} msg={msg} />
-            ))}
-            {isThinking && <ThinkingBubble />}
+            {messages.map((msg, index) =>
+              msg.text ? <MessageBubble key={index} msg={msg} /> : null
+            )}
+            {isThinking && !hasStartedStreaming && <ThinkingBubble />}
           </div>
         )}
       </div>
