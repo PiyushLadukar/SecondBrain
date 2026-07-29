@@ -4,6 +4,9 @@ from sqlalchemy.orm import Session
 from schemas import ChatRequest
 from ai import ask_ai
 from schemas import ChatCreate
+from fastapi.responses import StreamingResponse
+from ai import stream_ai
+import ollama
 
 from services.chat_services import (
     create_chat,
@@ -167,3 +170,30 @@ def new_chat(
 def all_chats():
 
     return get_chats()
+
+@app.post("/chat/stream")
+def chat_stream(request: ChatRequest):
+
+    return StreamingResponse(
+        stream_ai(request.message),
+        media_type="text/plain"
+    )
+
+
+@app.get("/ai/health")
+def ai_health():
+    try:
+        ollama.list()
+
+        return {
+            "status": "online",
+            "provider": "ollama",
+            "model": "llama3.2"
+        }
+
+    except Exception:
+        return {
+            "status": "offline",
+            "provider": "ollama",
+            "model": "llama3.2"
+        }

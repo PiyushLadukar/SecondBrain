@@ -448,40 +448,116 @@ export default function Chat() {
   }, [messages, isThinking])
 
   async function sendMessage(overrideText) {
-    const text = (overrideText ?? message).trim()
-    if (!text) return
+  const text = (overrideText ?? message).trim()
 
-    const userMessage = { sender: "user", text }
-    setMessages((prev) => [...prev, userMessage])
-    setMessage("")
-    setIsThinking(true)
+  if (!text || isThinking) return
 
-    try {
-      const response = await fetch("http://127.0.0.1:8000/chat", {
+  const userMessage = {
+    sender: "user",
+    text,
+  }
+
+  // Add user message + empty AI message
+  setMessages((prev) => [
+    ...prev,
+    userMessage,
+    {
+      sender: "ai",
+      text: "",
+    },
+  ])
+
+  setMessage("")
+  setIsThinking(true)
+
+  setMetrics((prev) => ({
+    ...prev,
+    status: "Generating",
+    responseTime: null,
+  }))
+
+  const startTime = performance.now()
+
+  try {
+    const response = await fetch(
+      "http://127.0.0.1:8000/chat/stream",
+      {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: text,
+        }),
+      }
+    )
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    if (!response.body) {
+      throw new Error("Streaming response unavailable")
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+
+    while (true) {
+      const { value, done } = await reader.read()
+
+      if (done) break
+
+      const chunk = decoder.decode(value, {
+        stream: true,
       })
 
-      const data = await response.json()
+      setMessages((prev) => {
+        const updated = [...prev]
+        const lastIndex = updated.length - 1
 
-      const aiMessage = { sender: "ai", text: data.response }
-      setMessages((prev) => [...prev, aiMessage])
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { sender: "ai", text: "Something went wrong reaching the AI service. Please try again." },
-      ])
-    } finally {
-      setIsThinking(false)
+        updated[lastIndex] = {
+          ...updated[lastIndex],
+          text: updated[lastIndex].text + chunk,
+        }
+
+        return updated
+      })
     }
-  }
 
-  function handleQuickAction(prompt) {
-    setMessage(prompt)
-  }
+    const time =
+      (performance.now() - startTime) / 1000
 
-  const showWelcome = messages.length <= 1 && !isThinking
+    setMetrics({
+      model: "llama3.2",
+      provider: "Ollama",
+      responseTime: time.toFixed(2),
+      status: "Ready",
+    })
+  } catch (err) {
+    console.error("Chat error:", err)
+
+    // Replace empty AI message with error
+    setMessages((prev) => {
+      const updated = [...prev]
+      const lastIndex = updated.length - 1
+
+      updated[lastIndex] = {
+        sender: "ai",
+        text: "I couldn't connect to the AI service. Make sure the backend and Ollama are running.",
+      }
+
+      return updated
+    })
+
+    setMetrics((prev) => ({
+      ...prev,
+      status: "Error",
+    }))
+  } finally {
+    setIsThinking(false)
+  }
+}
 
   return (
     <div
